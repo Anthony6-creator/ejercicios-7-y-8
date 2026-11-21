@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Caso 8 - Turnos Banco Finanzas Seguras</title>
+<style>
+  :root { --azul:#1d3349; --naranja:#f58a1f; --fondo:#f4f6f8; }
+  * { box-sizing:border-box; }
+  body { font-family:Arial, sans-serif; background:var(--fondo); margin:0; padding:24px; color:#222; }
+  .contenedor { max-width:820px; margin:auto; background:#fff; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,.1); overflow:hidden; }
+  header { background:var(--azul); color:#fff; padding:18px 24px; border-bottom:5px solid var(--naranja); }
+  header h1 { margin:0; font-size:22px; }
+  header p { margin:4px 0 0; font-size:14px; opacity:.85; }
+  main { padding:24px; }
+  .fila { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; }
+  .campo { flex:1; min-width:200px; display:flex; flex-direction:column; }
+  label { font-weight:bold; font-size:14px; margin-bottom:4px; }
+  input { padding:9px; border:1px solid #bbb; border-radius:6px; font-size:15px; }
+  button { padding:10px 18px; border:none; border-radius:6px; cursor:pointer; font-size:15px; color:#fff; background:var(--azul); }
+  button.naranja { background:var(--naranja); }
+  button:hover { opacity:.88; }
+  #mensaje { margin:14px 0; padding:10px 14px; border-radius:6px; display:none; font-size:14px; }
+  #mensaje.error { display:block; background:#fdecea; color:#a12622; border:1px solid #f5b5b0; }
+  #mensaje.advertencia { display:block; background:#fff6e0; color:#7a5200; border:1px solid #f1d28a; }
+  #mensaje.ok { display:block; background:#e7f6ea; color:#1e6b34; border:1px solid #a9dbb5; }
+  h2 { font-size:17px; color:var(--azul); border-bottom:2px solid var(--naranja); padding-bottom:4px; margin-top:26px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th { background:var(--azul); color:#fff; text-align:left; padding:8px; }
+  td { padding:8px; border-bottom:1px solid #e3e3e3; }
+  .atencion { background:#e8f1fb; border:2px solid var(--azul); border-radius:8px; padding:14px 18px; font-size:18px; color:var(--azul); }
+  .atencion.vacio { background:#fafafa; border:1px dashed #bbb; color:#777; font-size:14px; }
+  #estadisticas { background:#fafafa; border:1px solid #ddd; border-radius:8px; padding:14px 18px; display:none; }
+  #estadisticas p { margin:6px 0; }
+  #estadisticas .cierre { font-weight:bold; color:#1e6b34; }
+</style>
+</head>
+<body>
+<div class="contenedor">
+  <header>
+    <h1>Banco “Finanzas Seguras” — Sistema de Turnos</h1>
+    <p>Caso 8 · Técnica de programación · Vectores en JavaScript</p>
+  </header>
+
+  <main>
+    <!-- Campo de entrada y botones -->
+    <div class="fila">
+      <div class="campo">
+        <label for="cliente">Nombre del cliente</label>
+        <input type="text" id="cliente" placeholder="Ej. Ana">
+      </div>
+      <button id="btnAsignar" class="naranja">Asignar turno</button>
+      <button id="btnAtender">Atender siguiente</button>
+      <button id="btnStats">Ver estadísticas del día</button>
+    </div>
+
+    <div id="mensaje"></div>
+
+    <h2>En atención</h2>
+    <div id="atencion" class="atencion vacio">Ningún cliente en atención.</div>
+
+    <h2>Turnos pendientes</h2>
+    <table>
+      <thead><tr><th>Turno</th><th>Cliente</th></tr></thead>
+      <tbody id="listaTurnos"></tbody>
+    </table>
+
+    <h2>Estadísticas del día</h2>
+    <div id="estadisticas"></div>
+    <p id="sinStats" style="color:#777;font-size:14px">Presione “Ver estadísticas del día” para consultarlas.</p>
+  </main>
+</div>
+
+<script>
+/* ==========================================================
+   CASO 8: SISTEMA DE TURNOS - BANCO FINANZAS SEGURAS
+   Vectores unidimensionales:
+     turnos[]  -> nombres de los clientes que esperan (cola FIFO)
+     codigos[] -> código de turno (T-001, T-002...) de cada cliente,
+                  en la misma posición que turnos[]
+     atendidos[] -> nombres de los clientes ya atendidos en el día
+   ========================================================== */
+const turnos = [];
+const codigos = [];
+const atendidos = [];
+let contadorTurnos = 0;    // total de turnos asignados en el día (da el número T-00X)
+
+// Referencias al DOM
+const $cliente = document.getElementById("cliente");
+const $mensaje = document.getElementById("mensaje");
+const $lista = document.getElementById("listaTurnos");
+const $atencion = document.getElementById("atencion");
+const $stats = document.getElementById("estadisticas");
+const $sinStats = document.getElementById("sinStats");
+
+function mostrarMensaje(texto, tipo) {
+  $mensaje.textContent = texto;
+  $mensaje.className = tipo;
+}
+
+/* Convierte un número en código de turno con 3 dígitos: 1 -> "T-001" */
+function generarCodigo(numero) {
+  let texto = String(numero);
+  while (texto.length < 3) {   // ciclo while para rellenar con ceros
+    texto = "0" + texto;
+  }
+  return "T-" + texto;
+}
+
+/* Revisa si el nombre ya existe entre los pendientes o los ya atendidos
+   (sin distinguir mayúsculas). Recorre ambos vectores con ciclos for. */
+function nombreRepetido(nombre) {
+  const buscado = nombre.toLowerCase();
+  for (let i = 0; i < turnos.length; i++) {
+    if (turnos[i].toLowerCase() === buscado) return true;
+  }
+  for (let j = 0; j < atendidos.length; j++) {
+    if (atendidos[j].toLowerCase() === buscado) return true;
+  }
+  return false;
+}
+
+/* ---------- ASIGNAR TURNO ---------- */
+function asignarTurno() {
+  const nombre = $cliente.value.trim();
+
+  // Validación 1: nombre vacío
+  if (nombre === "") {
+    mostrarMensaje("Error: debe ingresar el nombre del cliente.", "error");
+    return;
+  }
+  // Validación 2: nombre duplicado
+  if (nombreRepetido(nombre)) {
+    mostrarMensaje('Advertencia: "' + nombre + '" ya tiene un turno registrado hoy.', "advertencia");
+    return;
+  }
+
+  contadorTurnos++;
+  const codigo = generarCodigo(contadorTurnos);
+  turnos.push(nombre);      // el cliente entra al final de la cola
+  codigos.push(codigo);
+
+  mostrarMensaje("Turno " + codigo + " asignado a " + nombre + ".", "ok");
+  $cliente.value = "";
+  $cliente.focus();
+  mostrarLista();
+}
+
+/* ---------- MOSTRAR LISTA DE TURNOS PENDIENTES ---------- */
+function mostrarLista() {
+  $lista.innerHTML = "";
+  for (let i = 0; i < turnos.length; i++) {
+    const fila = document.createElement("tr");
+    const c1 = document.createElement("td");
+    const c2 = document.createElement("td");
+    c1.textContent = codigos[i];
+    c2.textContent = turnos[i];
+    fila.append(c1, c2);
+    $lista.appendChild(fila);
+  }
+  if (turnos.length === 0) {
+    const fila = document.createElement("tr");
+    const c = document.createElement("td");
+    c.colSpan = 2;
+    c.style.color = "#777";
+    c.textContent = "No hay turnos pendientes.";
+    fila.appendChild(c);
+    $lista.appendChild(fila);
+  }
+}
+
+/* ---------- ATENDER SIGUIENTE ---------- */
+function atenderSiguiente() {
+  if (turnos.length === 0) {
+    mostrarMensaje("No hay clientes en espera.", "advertencia");
+    return;
+  }
+  // shift() quita y devuelve el elemento de la posición 0 (el primero en llegar)
+  const nombre = turnos.shift();
+  const codigo = codigos.shift();   // se mantiene el vector paralelo sincronizado
+  atendidos.push(nombre);
+
+  $atencion.className = "atencion";
+  $atencion.textContent = "Turno " + codigo + " — " + nombre + " (en atención)";
+  mostrarMensaje("Atendiendo a " + nombre + ".", "ok");
+  mostrarLista();
+}
+
+/* ---------- ESTADÍSTICAS DEL DÍA ---------- */
+function verEstadisticas() {
+  const totales = contadorTurnos;
+  const atendidosN = atendidos.length;
+  const pendientes = turnos.length;
+
+  if (totales === 0) {
+    mostrarMensaje("Aún no se ha asignado ningún turno hoy.", "advertencia");
+    return;
+  }
+
+  // Condicional: porcentaje = atendidos / totales * 100 (redondeado)
+  const porcentaje = Math.round((atendidosN / totales) * 100);
+
+  $stats.innerHTML = "";
+  const datos = [
+    "Turnos totales: " + totales,
+    "Atendidos: " + atendidosN,
+    "Pendientes: " + pendientes,
+    "Porcentaje atendido: " + porcentaje + "%"
+  ];
+  for (let i = 0; i < datos.length; i++) {
+    const p = document.createElement("p");
+    p.textContent = datos[i];
+    $stats.appendChild(p);
+  }
+  // Si ya no quedan pendientes se muestra el cierre de jornada
+  if (pendientes === 0) {
+    const p = document.createElement("p");
+    p.className = "cierre";
+    p.textContent = "Cierre de jornada: todos los turnos fueron atendidos. ¡Gracias!";
+    $stats.appendChild(p);
+  }
+  $stats.style.display = "block";
+  $sinStats.style.display = "none";
+  mostrarMensaje("Estadísticas actualizadas.", "ok");
+}
+
+// Eventos
+document.getElementById("btnAsignar").addEventListener("click", asignarTurno);
+document.getElementById("btnAtender").addEventListener("click", atenderSiguiente);
+document.getElementById("btnStats").addEventListener("click", verEstadisticas);
+$cliente.addEventListener("keydown", function (e) { if (e.key === "Enter") asignarTurno(); });
+mostrarLista();
+</script>
+</body>
+</html>
